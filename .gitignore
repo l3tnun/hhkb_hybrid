@@ -1,0 +1,24 @@
+# Build outputs
+.build/
+*.o
+*.elf
+*.hex
+*.map
+
+# Firmware binaries (do not distribute PFU/HHKB-derived binaries)
+*.hfb
+*.bin
+
+# Device-specific local data (e.g. EEPROM dumps with per-unit calibration).
+# The directory itself is kept in the repository (.gitkeep), so a fresh clone
+# has local/ ready to use; everything inside it stays untracked.
+local/*
+!local/.gitkeep
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Editor temporary files
+*.swp
+*.swo

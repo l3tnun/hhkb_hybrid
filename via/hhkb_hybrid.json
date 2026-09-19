@@ -1,0 +1,269 @@
+{
+  "name": "HHKB Hybrid QMK",
+  "vendorId": "0x04FE",
+  "productId": "0x0021",
+  "matrix": {
+    "rows": 4,
+    "cols": 15
+  },
+  "layouts": {
+    "keymap": [
+      [
+        "1,0",
+        "1,3",
+        "1,1",
+        "1,2",
+        "1,4",
+        "1,5",
+        "1,6",
+        "1,7",
+        "1,11",
+        "1,8",
+        "1,9",
+        "1,10",
+        "1,12",
+        "1,14",
+        "1,13"
+      ],
+      [
+        {
+          "w": 1.5
+        },
+        "2,0",
+        "2,3",
+        "2,1",
+        "2,2",
+        "2,4",
+        "2,5",
+        "2,7",
+        "2,11",
+        "2,8",
+        "2,9",
+        "2,10",
+        "2,12",
+        "2,14",
+        {
+          "w": 1.5
+        },
+        "2,13"
+      ],
+      [
+        {
+          "w": 1.75
+        },
+        "3,0",
+        "3,3",
+        "3,1",
+        "3,2",
+        "0,5",
+        "2,6",
+        "3,7",
+        "3,11",
+        "3,8",
+        "3,9",
+        "3,10",
+        "3,12",
+        {
+          "w": 2.25
+        },
+        "3,14"
+      ],
+      [
+        {
+          "w": 2.25
+        },
+        "0,0",
+        "0,1",
+        "0,2",
+        "3,4",
+        "3,5",
+        "3,6",
+        "0,7",
+        "0,11",
+        "0,8",
+        "0,9",
+        "0,12",
+        {
+          "w": 1.75
+        },
+        "0,14",
+        "3,13"
+      ],
+      [
+        {
+          "x": 1.5
+        },
+        "0,3",
+        {
+          "w": 1.5
+        },
+        "0,4",
+        {
+          "w": 6
+        },
+        "0,6",
+        {
+          "w": 1.5
+        },
+        "0,10",
+        "0,13"
+      ]
+    ]
+  },
+  "menus": [
+    {
+      "label": "HHKB",
+      "content": [
+        {
+          "label": "JIS/US \u88dc\u6b63",
+          "content": [
+            {
+              "label": "JIS/US \u88dc\u6b63\uff08JIS \u914d\u5217\u306e OS \u3067 US \u523b\u5370\u3069\u304a\u308a\u306b\u5165\u529b\uff09\u3002\u30ad\u30fc\u64cd\u4f5c\u3067\u5207\u308a\u66ff\u3048\u305f\u72b6\u614b\u306f\u3001\u30da\u30fc\u30b8\u3092\u518d\u8aad\u307f\u8fbc\u307f\u3059\u308b\u3068\u8868\u793a\u306b\u53cd\u6620\u3055\u308c\u307e\u3059",
+              "type": "toggle",
+              "content": [
+                "id_hhkb_jis_mode",
+                0,
+                1
+              ]
+            },
+            {
+              "label": "Ctrl+Alt+Shift+J \u3067\u88dc\u6b63\u3092\u5207\u66ff",
+              "type": "toggle",
+              "content": [
+                "id_hhkb_jis_combo",
+                0,
+                2
+              ]
+            }
+          ]
+        },
+        {
+          "label": "\u81ea\u52d5\u30b9\u30ea\u30fc\u30d7",
+          "content": [
+            {
+              "label": "\u7121\u64cd\u4f5c\u3067\u81ea\u52d5\u30b9\u30ea\u30fc\u30d7\u3059\u308b\u307e\u3067\u306e\u6642\u9593\uff08\u96fb\u6c60\u99c6\u52d5\u6642\u306e\u307f\u3002DIP SW6 \u304c ON \u306a\u3089\u7121\u52b9\uff09",
+              "type": "dropdown",
+              "options": [
+                [
+                  "1 \u5206",
+                  1
+                ],
+                [
+                  "5 \u5206",
+                  5
+                ],
+                [
+                  "10 \u5206",
+                  10
+                ],
+                [
+                  "30 \u5206\uff08\u65e2\u5b9a\uff09",
+                  30
+                ],
+                [
+                  "60 \u5206",
+                  60
+                ]
+              ],
+              "content": [
+                "id_hhkb_autosleep",
+                0,
+                3
+              ]
+            }
+          ]
+        },
+        {
+          "label": "Bluetooth \u30ad\u30fc\u64cd\u4f5c",
+          "content": [
+            {
+              "label": "\u7d14\u6b63\u4e92\u63db\u306e\u30ad\u30fc\u64cd\u4f5c\uff08Fn+Ctrl+1\u301c4 / Fn+Ctrl+0 / Fn+Q / Fn+X / Fn+Q \u306e\u5f8c Fn+Ctrl+Del+\u6570\u5b57\uff09\u3002OFF \u306b\u3059\u308b\u3068 VIA \u3067\u5272\u308a\u5f53\u3066\u305f BT \u30ad\u30fc\u3060\u3051\u3067\u64cd\u4f5c\u3057\u307e\u3059",
+              "type": "toggle",
+              "content": [
+                "id_hhkb_stock_combos",
+                0,
+                4
+              ]
+            }
+          ]
+        },
+        {
+          "label": "\u8a2d\u5b9a\u306e\u521d\u671f\u5316",
+          "content": [
+            {
+              "label": "\u30ad\u30fc\u30de\u30c3\u30d7\u30fb\u30de\u30af\u30ed\u30fb\u3053\u306e\u753b\u9762\u306e\u8a2d\u5b9a\u3092\u521d\u671f\u72b6\u614b\u306b\u623b\u3059\uff08JIS/US \u88dc\u6b63\u306e ON/OFF \u306f\u4fdd\u6301\uff09\u3002\u30ad\u30fc\u30dc\u30fc\u30c9\u304c\u518d\u8d77\u52d5\u3059\u308b\u306e\u3067\u3001\u30da\u30fc\u30b8\u3092\u518d\u8aad\u307f\u8fbc\u307f\u3057\u3066\u518d\u63a5\u7d9a\u3057\u3066\u304f\u3060\u3055\u3044",
+              "type": "button",
+              "content": [
+                "id_hhkb_reset",
+                0,
+                5
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "customKeycodes": [
+    {
+      "name": "JIS_TOG",
+      "title": "JIS/US \u88dc\u6b63\u306e ON/OFF",
+      "shortName": "JIS"
+    },
+    {
+      "name": "BT_SLOT1",
+      "title": "Bluetooth \u30b9\u30ed\u30c3\u30c8 1 \u306b\u5207\u66ff\uff08\u30da\u30a2\u30ea\u30f3\u30b0\u4e2d\u306f\u767b\u9332\uff09",
+      "shortName": "BT1"
+    },
+    {
+      "name": "BT_SLOT2",
+      "title": "Bluetooth \u30b9\u30ed\u30c3\u30c8 2 \u306b\u5207\u66ff\uff08\u30da\u30a2\u30ea\u30f3\u30b0\u4e2d\u306f\u767b\u9332\uff09",
+      "shortName": "BT2"
+    },
+    {
+      "name": "BT_SLOT3",
+      "title": "Bluetooth \u30b9\u30ed\u30c3\u30c8 3 \u306b\u5207\u66ff\uff08\u30da\u30a2\u30ea\u30f3\u30b0\u4e2d\u306f\u767b\u9332\uff09",
+      "shortName": "BT3"
+    },
+    {
+      "name": "BT_SLOT4",
+      "title": "Bluetooth \u30b9\u30ed\u30c3\u30c8 4 \u306b\u5207\u66ff\uff08\u30da\u30a2\u30ea\u30f3\u30b0\u4e2d\u306f\u767b\u9332\uff09",
+      "shortName": "BT4"
+    },
+    {
+      "name": "BT_PAIR",
+      "title": "Bluetooth \u30da\u30a2\u30ea\u30f3\u30b0\u958b\u59cb",
+      "shortName": "Pair"
+    },
+    {
+      "name": "BT_CANCEL",
+      "title": "Bluetooth \u30da\u30a2\u30ea\u30f3\u30b0\u53d6\u6d88",
+      "shortName": "PCan"
+    },
+    {
+      "name": "OUT_AUTO",
+      "title": "\u51fa\u529b\u3092\u81ea\u52d5\uff08USB \u512a\u5148\uff09\u306b\u623b\u3059",
+      "shortName": "USB"
+    },
+    {
+      "name": "BT_DEL1",
+      "title": "Bluetooth \u30b9\u30ed\u30c3\u30c8 1 \u306e\u767b\u9332\u524a\u9664\uff08\u30da\u30a2\u30ea\u30f3\u30b0\u30e2\u30fc\u30c9\u4e2d\u306e\u307f\uff09",
+      "shortName": "BDel1"
+    },
+    {
+      "name": "BT_DEL2",
+      "title": "Bluetooth \u30b9\u30ed\u30c3\u30c8 2 \u306e\u767b\u9332\u524a\u9664\uff08\u30da\u30a2\u30ea\u30f3\u30b0\u30e2\u30fc\u30c9\u4e2d\u306e\u307f\uff09",
+      "shortName": "BDel2"
+    },
+    {
+      "name": "BT_DEL3",
+      "title": "Bluetooth \u30b9\u30ed\u30c3\u30c8 3 \u306e\u767b\u9332\u524a\u9664\uff08\u30da\u30a2\u30ea\u30f3\u30b0\u30e2\u30fc\u30c9\u4e2d\u306e\u307f\uff09",
+      "shortName": "BDel3"
+    },
+    {
+      "name": "BT_DEL4",
+      "title": "Bluetooth \u30b9\u30ed\u30c3\u30c8 4 \u306e\u767b\u9332\u524a\u9664\uff08\u30da\u30a2\u30ea\u30f3\u30b0\u30e2\u30fc\u30c9\u4e2d\u306e\u307f\uff09",
+      "shortName": "BDel4"
+    }
+  ]
+}
