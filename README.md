@@ -43,6 +43,7 @@ HHKB Professional HYBRID（英語配列, `PD-KB800` 系, USB `04fe:0021`）の�
 - ✅ Bluetooth（nRF52832 経由）での入力・スロット切替・ペアリング
 - ✅ メディアキー（音量など、BLE consumer）
 - ✅ 電源ボタン（長押しで OFF）・無操作自動スリープ（STOP モード, DIP SW6 で無効化）
+- ⚠️ 電池駆動時の省電力動作（4 MHz 動作、走査の間引きと Sleep、USB・読み取り回路の停止。既定で有効、`-e HHKB_LOW_POWER=no` で従来の動作に戻せる）。電池駆動でのキー入力・Bluetooth の接続と切替・電源ボタン長押しの OFF と起動・USB の抜き差しは実機で確認済み。自動スリープ・電源ボタン短押し・電池残量の表示・VIA は未確認。電池持ちの改善幅は未測定 — [docs/usage.md](docs/usage.md#電池駆動時の省電力動作)
 - ✅ インジケータ LED（接続状態・電源・電池低下）
 - ✅ 最後に使った BT スロットへ電源 ON 時に再接続（見つからないときは約 60 秒で打ち切り。詳細は [docs/usage.md](docs/usage.md)）
 - ✅ bootmagic（Esc を押しながら接続 → 純正の更新モードに入り、純正 FW へ復帰可能）

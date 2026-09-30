@@ -18,6 +18,9 @@
 #include "power.h"
 #include "nrf_spi.h"
 #include "led_indicator.h"
+#ifdef HHKB_LOW_POWER
+#    include "usb_main.h"
+#endif
 
 #define PWR_BUTTON_PIN C5  /* low = pressed */
 #define USB_VBUS_PIN   C13 /* low = USB power present */
@@ -49,6 +52,145 @@
 #define SLEEP_EE_ADDR    0x08080520u  /* sleep timeout in minutes, 1..60 */
 #define NVM_PEKEY1       0x89ABCDEFu
 #define NVM_PEKEY2       0x02030405u
+
+#ifdef HHKB_LOW_POWER
+/* Battery low-power run (docs/reverse-engineering/power-management.md §7).
+   The stock firmware runs at 4 MHz on battery (HSI16 / 4 into the PLL) and at
+   16 MHz only on USB power. ChibiOS is built for the 32 MHz PLL clock (USB needs
+   it), so on battery we switch at run time to HSI16 / 4 = 4 MHz with the PLL,
+   MSI and HSI48 off, and the USB peripheral stopped; on USB power we switch back.
+   Both timers whose prescaler ChibiOS computes from the build-time clock are
+   corrected at each switch: TIM21 (system tick) and TIM3 (wait_us). */
+#    if STM32_ST_USE_TIMER != 21
+#        error "power.c retimes TIM21 as the ChibiOS system tick"
+#    endif
+#    define LP_HCLK_HZ    4000000u  /* HSI16 / 4 (RCC_CR HSIDIVEN) */
+#    define MID_HCLK_HZ   16000000u /* HSI16, only while the PLL locks */
+#    define VBUS_STABLE_MS 50       /* PC13 must be stable this long to switch */
+/* No switch during start-up: QMK starts USB after keyboard_pre_init, and USB
+   must never be started without the PLL. */
+#    define BOOT_SETTLE_MS 1000
+
+static bool     lp_clock;         /* running at LP_HCLK_HZ, USB stopped */
+static bool     lp_vbus_last;
+static uint16_t lp_vbus_since;
+static uint16_t lp_scan_start;
+
+/* Timers clocked from PCLK (PPRE1 = PPRE2 = 1, so TIMCLK = HCLK). Keep the
+   TIM21 count (it is the system time in tickless mode): UG reloads the
+   prescaler at once and clears the count, which is then written back. */
+static void retime_timers(uint32_t hclk) {
+    uint16_t cnt = (uint16_t)TIM21->CNT;
+    TIM21->PSC   = (uint16_t)(hclk / CH_CFG_ST_FREQUENCY - 1u);
+    TIM21->EGR   = TIM_EGR_UG;
+    TIM21->CNT   = cnt;
+    TIM21->SR    = ~TIM_SR_UIF; /* UG sets UIF; the update interrupt is unused */
+    GPTD3.clock  = hclk;         /* wait_us: gptStart() derives PSC from it */
+}
+
+static void clock_down(void) {
+    /* USB cannot run without the PLL: detach and power the transceiver down
+       (the stock firmware does not start USB on battery). */
+    if (USB_DRIVER.state != USB_STOP) {
+        usbDisconnectBus(&USB_DRIVER);
+        usbStop(&USB_DRIVER);
+    }
+    /* Make sure TIM3 is started, so that retime_timers() sets GPTD3.clock for
+       good. Not wait_us(1): that programs ARR = 0 and the timer never updates. */
+    wait_us(2);
+
+    chSysLock();
+    /* PLL -> HSI16 (16 MHz, still 1 wait state), then PLL off, then /4. The
+       divider also feeds the PLL, so it may only be set with the PLL unused. */
+    RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_HSI;
+    while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_HSI) {
+    }
+    RCC->CR &= ~RCC_CR_PLLON;
+    RCC->CR |= RCC_CR_HSIDIVEN;
+    while (!(RCC->CR & RCC_CR_HSIDIVF)) {
+    }
+    /* 4 MHz in range 1: zero wait states, no prefetch / pre-read. */
+    FLASH->ACR &= ~(FLASH_ACR_LATENCY | FLASH_ACR_PRFTEN | FLASH_ACR_PRE_READ);
+    retime_timers(LP_HCLK_HZ);
+    chSysUnlock();
+
+    /* Oscillators nothing uses on battery: MSI (ChibiOS keeps it as a PLL
+       fallback), HSI48 and its reference buffer (left on by the bootloader
+       when it saw USB power), CRS. LSI stays on for the IWDG and LPTIM1. */
+    RCC->CR &= ~RCC_CR_MSION;
+    RCC->CRRCR &= ~RCC_CRRCR_HSI48ON;
+    SYSCFG->CFGR3 &= ~(SYSCFG_CFGR3_ENREF_HSI48 | SYSCFG_CFGR3_ENBUF_VREFINT_ADC | SYSCFG_CFGR3_ENBUF_SENSOR_ADC);
+    RCC->APB1ENR &= ~RCC_APB1ENR_CRSEN;
+    lp_clock = true;
+}
+
+static void clock_up(void) {
+    /* 32 MHz needs one wait state: set it before raising the clock. */
+    FLASH->ACR |= FLASH_ACR_LATENCY | FLASH_ACR_PRFTEN | FLASH_ACR_PRE_READ;
+    while (!(FLASH->ACR & FLASH_ACR_LATENCY)) {
+    }
+    chSysLock();
+    RCC->CR &= ~RCC_CR_HSIDIVEN;
+    while (RCC->CR & RCC_CR_HSIDIVF) {
+    }
+    retime_timers(MID_HCLK_HZ);
+    chSysUnlock();
+
+    /* The PLL settings written by stm32_clock_init() are still in RCC_CFGR.
+       Wait for the lock with interrupts on (the nRF SPI link keeps running). */
+    RCC->CR |= RCC_CR_MSION | RCC_CR_PLLON;
+    while (!(RCC->CR & RCC_CR_PLLRDY)) {
+    }
+
+    chSysLock();
+    RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;
+    while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL) {
+    }
+    retime_timers(STM32_HCLK);
+    chSysUnlock();
+    lp_clock = false;
+
+    restart_usb_driver(&USB_DRIVER);
+}
+
+bool power_low_clock(void) {
+    return lp_clock;
+}
+
+/* Switch the clock once PC13 has been stable for VBUS_STABLE_MS (a glitch must
+   not drop a working USB link), and not before BOOT_SETTLE_MS after start-up.
+   The board starts at 32 MHz with USB running, as without HHKB_LOW_POWER. */
+static void clock_task(bool vbus) {
+    if (vbus != lp_vbus_last) {
+        lp_vbus_last  = vbus;
+        lp_vbus_since = timer_read();
+        return;
+    }
+    if (timer_read32() < BOOT_SETTLE_MS || timer_elapsed(lp_vbus_since) < VBUS_STABLE_MS) {
+        return;
+    }
+    if (vbus && lp_clock) {
+        clock_up();
+    } else if (!vbus && !lp_clock) {
+        clock_down();
+    }
+}
+
+/* Battery only: sleep for the rest of the scan period instead of scanning
+   continuously (the ChibiOS idle thread runs WFI; QMK enables
+   CORTEX_ENABLE_WFI_IDLE by default). The stock firmware scans every ~11 ms on
+   battery. */
+void power_idle(void) {
+    if (!lp_clock) {
+        return;
+    }
+    uint16_t spent = timer_elapsed(lp_scan_start);
+    if (spent < HHKB_LP_SCAN_INTERVAL_MS) {
+        chThdSleepMilliseconds(HHKB_LP_SCAN_INTERVAL_MS - spent);
+    }
+    lp_scan_start = timer_read();
+}
+#endif
 
 static uint32_t inactivity_start;
 static uint32_t autosleep_timeout_ms = HHKB_AUTOSLEEP_TIMEOUT_MS;
@@ -272,6 +414,9 @@ void power_set_autosleep_timeout(uint32_t ms) {
 }
 
 void power_task(bool vbus) {
+#ifdef HHKB_LOW_POWER
+    clock_task(vbus);
+#endif
     if (vbus) {
         button_was_down  = false;
         inactivity_start = timer_read32();

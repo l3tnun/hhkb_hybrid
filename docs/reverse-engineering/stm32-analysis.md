@@ -26,6 +26,7 @@ HFB `HHKB800_FW_A048.hfb` (sha256=635b995e...) の STM32 アプリ部分 (`[4:4+
 | `0x89ABCDEF` / `0x02030405` | EEPROM (PEKEYR) キー | — |
 
 - 既存パッチ (`-mcpu=cortex-m0` でアセンブル) は Cortex-M0+ 向けとして正しい
+- 動作クロック (電池 4 MHz / USB 16 MHz)、TIM21 の 1 ms 刻み、キー走査の周期と 1 キーごとの手順 (OpAmp・C14・ADC の扱い) は [power-management.md](power-management.md) §7
 
 ## 2. SPI1 通信 [確定度高: バス。内容: 要実測]
 

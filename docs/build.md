@@ -29,6 +29,7 @@ Next: convert to an HFB and flash (see docs/quickstart.md):
 | オプション | 内容 |
 |---|---|
 | `-e HHKB_JIS_US_TOGGLE=no` | JIS/US 補正の機能をビルドから外す（[jis-us-toggle.md](jis-us-toggle.md)） |
+| `-e HHKB_LOW_POWER=no` | 電池駆動時の省電力動作（4 MHz 動作、走査の間引き、USB と ADC の停止。[usage.md](usage.md#電池駆動時の省電力動作)）をビルドから外す。省電力動作で問題が出たときに従来の動作へ戻すためのもので、このオプションを付けたビルドは省電力動作を入れる前のファームと同じバイナリになる |
 
 ## 成果物
 
@@ -73,6 +74,14 @@ python3 tools/qmk_to_hfb.py qmk_firmware/.build/hhkb_hybrid_via.bin local/HHKB80
 - ビルドに使う Docker イメージもダイジェストで固定しています。
 - そのため、同じコミットからは同じ `.bin` が得られるはずです。**確認するには、別の環境でビルドした `.bin` の sha256**（`build.sh` と `qmk_to_hfb.py` が表示）**を比べてください。** アプリ領域の CRC（`header64` の右側の値）でも照合できます。
 - `qmk_to_hfb.py` の `match=True` は変換直後の自己確認なので、再現性の確認にはなりません。
+- このリポジトリの内容からビルドしたときの sha256 は次のとおりです（`keyboards/hhkb_hybrid/` を変更したら、この表も更新してください）。
+
+  | ビルド | `.bin` の sha256 |
+  |---|---|
+  | `./tools/build.sh via` | `b5d82c52c1f8ed37856cc7c623d539d79ae1eba3a5e8c369f8dd301058a98aa5` |
+  | `./tools/build.sh default` | `70a90ee725d76077692a4d1c32cc07839860590dc4c12f1a799b712ead700dc6` |
+  | `./tools/build.sh via -e HHKB_LOW_POWER=no` | `913a43804ba48d9f360828e9dde4fa9689a96be0bdc8c2d7312df0196ec4721d` |
+  | `./tools/build.sh default -e HHKB_LOW_POWER=no` | `7545454fc358e8b160163efc87f3c5c5dd82b92ff96351c5172e35640537b1c6` |
 
 ## EEPROM 参照の検査
 

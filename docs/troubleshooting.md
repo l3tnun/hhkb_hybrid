@@ -77,6 +77,7 @@ usb 3-1: can't read configurations, error -71
 | `HHKB-Hybrid` と表示され、**青 LED が点灯したまま**キーが効かない（純正 FW に戻した直後など） | 純正 FW が Bluetooth の接続先へ再接続中で、入力が USB に出ていない | **Fn + Ctrl + 0** で USB に切り替える。それでも効かなければ次の行 |
 | `HHKB-Hybrid` と表示され、キーがまったく効かない | 更新モード（bootmagic、書き込みの中断、QMK のフェイルセーフ） | `--resume` で HFB を書き込む（[device-state.md](device-state.md)） |
 | 純正に戻したら、入力できないキーや刻印と違う文字が多発する | VIA 対応版の設定が純正のキーマップ領域に残ったまま戻した | [restore-stock.md](restore-stock.md) の「すでにキー入力が崩れてしまった場合」 |
+| 電池駆動のときだけ、キーの取りこぼし・誤入力、Bluetooth の切断、反応しないなどが起きる（USB 接続では起きない） | 電池駆動時の省電力動作（`HHKB_LOW_POWER`、[usage.md](usage.md#電池駆動時の省電力動作)）が関係している可能性がある | USB に接続する。`HHKB Hybrid QMK` なら、`-e HHKB_LOW_POWER=no` でビルドしたファームを書き込んで同じ症状が出るか確かめる。`HHKB-Hybrid` でキーが効かなければ更新モードなので、同じファームを `--resume` で書き込む |
 | JIS 配列の OS で記号がずれる / US 配列の OS で記号がずれる | JIS/US 補正の ON/OFF が合っていない | Ctrl+Alt+Shift+J で切り替える（[jis-us-toggle.md](jis-us-toggle.md)） |
 | VIA で変えたキーが効かない | 別のレイヤーに割り当てた | VIA でレイヤー番号を確認する |
 

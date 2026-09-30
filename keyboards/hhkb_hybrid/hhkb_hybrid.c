@@ -909,6 +909,7 @@ void housekeeping_task_kb(void) {
         watchdog_feed();
     }
     housekeeping_task_user();
+    power_idle(); /* battery: sleep until the next scan */
 }
 
 void suspend_power_down_kb(void) {

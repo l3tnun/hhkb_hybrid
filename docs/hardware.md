@@ -64,6 +64,7 @@ DFU での生書き込みは CRC を更新しないため起動しない。HID �
 - **PC4**（Low=DIP SW6 ON）：自動スリープ無効化
 - OFF/スリープは STM32 の **STOP モード**。起床は PC5（ボタン）/ PC13（USB）の立ち下がりのみ。LPTIM1（LSI, 約 2 秒）で定期起床して IWDG を更新
 - 起床時は `NVIC_SystemReset`（ソフトウェアリセット）。IWDG リセットではないので更新モードには落ちない
+- 動作中のクロック：USB 給電中は 32 MHz（PLL。USB に必要）。電池駆動中は 4 MHz（HSI16 ÷4）で、キーの走査の間は Sleep（純正も電池駆動時は 4 MHz。ビルドオプション `HHKB_LOW_POWER`、[usage.md](usage.md#電池駆動時の省電力動作)）
 - 詳細：[reverse-engineering/power-management.md](reverse-engineering/power-management.md)
 
 ## 電池残量

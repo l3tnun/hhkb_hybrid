@@ -20,6 +20,11 @@
    30 min. */
 #define HHKB_AUTOSLEEP_TIMEOUT_MS 1800000
 
+/* Battery low-power run (HHKB_LOW_POWER, power.c): one matrix scan per this
+   period, sleeping in between (the stock firmware scans every ~11 ms on
+   battery). */
+#define HHKB_LP_SCAN_INTERVAL_MS 5
+
 /* Keep the main loop running while USB is suspended (no host, charger only, or
    battery): key scanning, Bluetooth output and the watchdog feed must not stop.
    Remote wakeup is handled in process_record_kb instead. */

@@ -13,5 +13,5 @@
 | [implementation.md](implementation.md) | HFB 形式、HID 更新プロトコル（E0〜E3、QMK 独自の F0）、更新モードでの USB エラー |
 | [bluetooth-protocol.md](bluetooth-protocol.md) | STM32 と nRF52832（Bluetooth）の SPI 通信 |
 | [nrf-image.md](nrf-image.md) | HFB に含まれる nRF ファームの解析 |
-| [power-management.md](power-management.md) | 電源ボタン・スリープ・電池 |
+| [power-management.md](power-management.md) | 電源ボタン・スリープ・電池、電池駆動時と USB 給電時の動作クロックとキー走査（QMK の省電力動作の根拠） |
 | [led-indication.md](led-indication.md) | 純正 FW の LED 表示 |

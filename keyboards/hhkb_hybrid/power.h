@@ -10,6 +10,23 @@
    __early_init re-runs a full clean boot (docs/reverse-engineering/power-management.md). */
 void power_init(void);
 
+/* Battery low-power run (HHKB_LOW_POWER, docs/reverse-engineering/power-management.md §7).
+   power_task() drops the clock to 4 MHz and stops USB on battery (after
+   start-up, with USB power stably absent), and switches back when USB power
+   comes. power_low_clock() is true while at 4 MHz.
+   power_idle(): call at the end of each main-loop pass; at 4 MHz it sleeps for
+   the rest of the HHKB_LP_SCAN_INTERVAL_MS scan period. Both are no-ops without
+   HHKB_LOW_POWER. */
+#ifdef HHKB_LOW_POWER
+bool power_low_clock(void);
+void power_idle(void);
+#else
+static inline bool power_low_clock(void) {
+    return false;
+}
+static inline void power_idle(void) {}
+#endif
+
 /* Call every housekeeping cycle with the current USB-power state.
    Handles the power button and the inactivity timer; may not return (it enters
    STOP and later resets). */
