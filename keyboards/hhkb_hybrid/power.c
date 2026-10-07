@@ -31,6 +31,7 @@
 #define BUTTON_ON_MIN_MS   1000
 #define BUTTON_ON_MAX_MS   10000
 #define OFF_ORANGE_MS      1500 /* keep the orange 'off' indication visible */
+#define OFF_IDLE_WAIT_MS   3000 /* stock: wait up to 3 s for 83 01 after the idle request */
 
 /* LSI ~37 kHz, LPTIM1 prescaler /128 -> ~289 Hz. */
 #define LSI_HZ         37000u
@@ -290,13 +291,29 @@ static void enter_off(void) {
     led_set_mode(LED_MODE_OFF);
     gpio_write_pin_high(A9); /* orange while shutting down (auto-sleep too) */
 
+    /* Like the stock firmware: idle the nRF (drops the link) and wait until it
+       has read the request and reports no link, re-pulsing PB6 if it missed
+       it. STOP turns SPI1 off, so a late follow-up would go unanswered. Keep
+       the orange on for at least OFF_ORANGE_MS. */
     nrf_spi_bt_idle();
-    for (uint16_t i = 0; i < OFF_ORANGE_MS; i++) {
-        wait_ms(1); /* keep orange on: wait for the link to idle, but at least OFF_ORANGE_MS */
+    for (uint16_t i = 0; i < OFF_IDLE_WAIT_MS; i++) {
+        nrf_spi_task();
+        if (i >= OFF_ORANGE_MS && !nrf_spi_control_busy() && nrf_spi_connected_slot() < 0) {
+            break;
+        }
+        wait_ms(1);
         if ((i & 0x1FF) == 0) {
             iwdg_refresh();
         }
     }
+    /* Then hold the nRF stopped (PD2 high) while off, so the link always drops.
+       The stock nRF defers the idle's disconnect while it counts a notification
+       as in flight, and it decrements that count by one per HVN_TX_COMPLETE
+       event whatever the event's count, so after media keys (4 notifications)
+       or fast typing the count never returns to 0 and the link stays up
+       (docs/reverse-engineering/bluetooth-protocol.md §14). Power-on resets the
+       board and the bootloader restarts the nRF anyway. */
+    nrf_spi_set_pd2(true);
 
     __disable_irq();
     nvic_for_stop();

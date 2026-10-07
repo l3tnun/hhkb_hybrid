@@ -213,6 +213,13 @@ static void bt_begin_try(void) {
     bt_try_select_sent = false;
 }
 
+/* Like the stock firmware when the nRF stops answering: reset the board. The
+   bootloader holds PD2 high, so the nRF restarts too; the power-on path
+   (power.c) resets the same way. */
+static void bt_reset_board(void) {
+    mcu_reset(); /* does not return */
+}
+
 static void select_bt_slot(uint8_t slot) {
     last_slot = slot;
     power_save_last_slot(slot);
@@ -258,12 +265,21 @@ static void pairing_cancel(void) {
     bt_try_select_sent = true;
 }
 
+/* Key or power short press after the reconnect gave up (the nRF reports no link).
+   The stock firmware sends 10/06 again here, but after a long idle (seen: iPad
+   Bluetooth off for 11 min) the nRF accepted it and still did not reconnect,
+   while a power off/on did at once. So restart the board, which restarts the
+   nRF like a power-on, and reconnect the last slot (~10 s). Not in the stock firmware. */
+static void bt_retry_after_giveup(void) {
+    bt_reset_board(); /* does not return */
+}
+
 static void bt_on_user_wake(void) {
     if (pairing_mode || bonding_wait || !output_bt) {
         return;
     }
     if (bt_phase == BT_PHASE_GIVEUP && nrf_spi_connected_slot() < 0) {
-        bt_begin_try();
+        bt_retry_after_giveup();
     }
 }
 
@@ -272,7 +288,7 @@ static void power_short_press(void) {
         return;
     }
     if (bt_phase == BT_PHASE_GIVEUP && output_bt) {
-        bt_begin_try();
+        bt_retry_after_giveup();
         return;
     }
     int8_t slot = nrf_spi_connected_slot();
@@ -830,6 +846,17 @@ void housekeeping_task_kb(void) {
     bool host_present = vbus && usb_configured && (usb_state == USB_ACTIVE || usb_state == USB_SUSPENDED);
 
     nrf_spi_task();
+    /* The nRF left a request unread: reset like the stock firmware. Only while
+       BT is the output, so a dead nRF never interrupts typing over USB. */
+    if (output_bt && nrf_spi_unresponsive()) {
+        bt_reset_board();
+    }
+    /* The nRF rebooted by itself: its link and pairing state are gone. */
+    if (nrf_spi_take_restart() && output_bt) {
+        pairing_mode = false;
+        bonding_wait = false;
+        bt_begin_try();
+    }
     battery_task(vbus);
     if (pairing_mode && timer_elapsed32(pairing_since) > PAIRING_TIMEOUT_MS) {
         pairing_cancel();
@@ -870,6 +897,10 @@ void housekeeping_task_kb(void) {
         }
     }
 
+    /* New bond up on the chosen slot (83 (slot<<4)|3 after the 01 slot request). */
+    if (bonding_wait && !nrf_spi_control_busy() && nrf_spi_connected_slot() == (int8_t)last_slot) {
+        bonding_wait = false;
+    }
     /* Reconnect window (stock state 4, 60 s). Do not auto-pair empty slots. */
     if (pairing_mode || bonding_wait) {
         /* pairing / open advertising own the link */
@@ -879,12 +910,18 @@ void housekeeping_task_kb(void) {
     } else if (nrf_spi_connected_slot() >= 0) {
         bt_phase           = BT_PHASE_UP;
         bt_try_select_sent = false;
-        bonding_wait       = false;
-    } else if (bt_phase == BT_PHASE_UP || bt_phase == BT_PHASE_NONE) {
+    } else if (bt_phase == BT_PHASE_UP) {
+        /* Link lost: like the stock state 3, send nothing for 60 s. The nRF
+           advertises again by itself (its SDK restarts advertising on a
+           disconnect), then we idle it as on any failed reconnect. */
+        bt_begin_try();
+        bt_try_select_sent = true;
+    } else if (bt_phase == BT_PHASE_NONE) {
         bt_begin_try();
     }
     if (!pairing_mode && !bonding_wait && output_bt && bt_phase == BT_PHASE_TRY) {
-        if (!bt_try_select_sent && !nrf_spi_control_busy()) {
+        /* An idle still unread (e.g. from the 60 s give-up) is replaced by the select. */
+        if (!bt_try_select_sent && (!nrf_spi_control_busy() || nrf_spi_idle_unread())) {
             bt_release_before_control();
             nrf_spi_select_slot(last_slot);
             bt_try_select_sent = true;

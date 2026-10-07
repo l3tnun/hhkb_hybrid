@@ -36,8 +36,15 @@
 #define NRF_CONTROL_IDLE   0x10 /* 0x03 answer: stop advertising / disconnect */
 #define NRF_NOTIFY_LINK    0x83
 
-#define REQUEST_RETRY_MS 30
-#define REQUEST_RETRIES  5
+#define REQUEST_RETRY_MS      30
+#define REQUEST_RETRIES       5   /* fast re-pulses, then one every REQUEST_RETRY_SLOW_MS */
+#define REQUEST_RETRY_SLOW_MS 100
+
+/* The stock STM32 resets the board when the nRF does not poll within 20 ms after
+   3 re-pulses, or does not send the follow-up query (03/06) within 100 ms
+   (0x080109fc, 0x0801cfb4). We allow more, since SoftDevice flash operations
+   stall the nRF CPU. Only judged after the hello: the nRF boots for ~8 s. */
+#define NRF_RESPONSE_TIMEOUT_MS 1000
 
 #define TX_MAX 16
 
@@ -64,7 +71,16 @@ static uint8_t battery_level;
 static uint16_t last_request_time;
 static uint8_t  request_retries;
 
+/* When each queued item was first left for the nRF to read (timer_read32). */
+static uint32_t report_since;
+static uint32_t consumer_since;
+static uint32_t control_since;
+static uint32_t battery_since;
+static bool     unresponsive;
+
 static bool    hello_seen;   /* nRF sent its 0x01 hello */
+static bool    rehello;      /* a hello arrived: (re)start the response timeouts */
+static bool    restarted;    /* a hello after the first one: the nRF rebooted */
 static uint8_t last_link;    /* last 0x83 notification value */
 
 
@@ -149,7 +165,16 @@ static void handle_rx(uint8_t b) {
             return;
         case NRF_CMD_HELLO: {
             static const uint8_t reply[] = {NRF_SYNC, NRF_HELLO_REPLY};
+            if (hello_seen) {
+                /* The nRF restarted on its own: no link, and any transaction it
+                   was in is gone (the main loop re-arms the timeouts). */
+                last_link      = 0;
+                control_polled = false;
+                battery_polled = false;
+                restarted      = true;
+            }
             hello_seen = true;
+            rehello    = true; /* requests queued before the hello start their timeout now */
             tx_start(reply, sizeof(reply));
             break;
         }
@@ -223,19 +248,55 @@ void nrf_spi_request(void) {
     last_request_time = timer_read();
 }
 
+static bool timed_out(bool pending, uint32_t since) {
+    return pending && timer_elapsed32(since) > NRF_RESPONSE_TIMEOUT_MS;
+}
+
 void nrf_spi_task(void) {
-    bool waiting;
+    bool rp, cp, ctl, bp, ready, hello;
     chSysLock();
-    waiting = report_pending || consumer_pending || control_pending || (battery_pending && !battery_polled);
+    rp        = report_pending;
+    cp        = consumer_pending;
+    ctl       = control_pending; /* until the nRF reads the 03/06 answer */
+    bp        = battery_pending && !battery_polled; /* the level is taken from the 02 answer */
+    ready     = hello_seen;
+    hello     = rehello;
+    rehello   = false;
     chSysUnlock();
-    if (!waiting) {
+    if (hello) {
+        uint32_t now   = timer_read32();
+        report_since   = now;
+        consumer_since = now;
+        control_since  = now;
+        battery_since  = now;
+    }
+    if (ready && (timed_out(rp, report_since) || timed_out(cp, consumer_since) || timed_out(ctl, control_since) || timed_out(bp, battery_since))) {
+        unresponsive = true;
+    }
+    if (!(rp || cp || ctl || bp)) {
         request_retries = 0;
         return;
     }
-    if (request_retries < REQUEST_RETRIES && timer_elapsed(last_request_time) > REQUEST_RETRY_MS) {
-        request_retries++;
+    uint16_t interval = request_retries < REQUEST_RETRIES ? REQUEST_RETRY_MS : REQUEST_RETRY_SLOW_MS;
+    if (timer_elapsed(last_request_time) > interval) {
+        if (request_retries < REQUEST_RETRIES) {
+            request_retries++;
+        }
         nrf_spi_request();
     }
+}
+
+bool nrf_spi_unresponsive(void) {
+    return unresponsive;
+}
+
+bool nrf_spi_take_restart(void) {
+    bool r;
+    chSysLock();
+    r         = restarted;
+    restarted = false;
+    chSysUnlock();
+    return r;
 }
 
 void nrf_spi_set_pd2(bool high) {
@@ -253,6 +314,9 @@ int8_t nrf_spi_connected_slot(void) {
 
 void nrf_spi_send_keyboard(const report_keyboard_t *report) {
     chSysLock();
+    if (!report_pending) {
+        report_since = timer_read32();
+    }
     report_mods = report->mods;
     memcpy(report_keys, report->keys, sizeof(report_keys));
     report_pending = true;
@@ -265,8 +329,18 @@ bool nrf_spi_report_idle(void) {
     return !report_pending;
 }
 
+/* Wait (bounded) while the nRF is reading the current request: it answered our
+   0x02 with the request type and its 0x03/0x06 follow-up is still to come.
+   Replacing the request then leaves that follow-up unanswered, and the nRF
+   keeps retrying it. */
+#define CONTROL_FOLLOWUP_WAIT_MS 100
+
 static void control_start(uint8_t poll, uint8_t type, uint8_t value) {
+    for (uint8_t i = 0; i < CONTROL_FOLLOWUP_WAIT_MS && *(volatile bool *)&control_polled; i++) {
+        wait_ms(1);
+    }
     chSysLock();
+    control_since   = timer_read32();
     control_poll    = poll;
     control_type    = type;
     control_value   = value;
@@ -297,8 +371,19 @@ bool nrf_spi_control_busy(void) {
     return control_pending;
 }
 
+bool nrf_spi_idle_unread(void) {
+    bool unread;
+    chSysLock();
+    unread = control_pending && !control_polled && control_poll == NRF_POLL_CONTROL && control_type == NRF_CONTROL_IDLE;
+    chSysUnlock();
+    return unread;
+}
+
 void nrf_spi_send_consumer(const uint8_t bits[4]) {
     chSysLock();
+    if (!consumer_pending) {
+        consumer_since = timer_read32();
+    }
     memcpy(consumer_bits, bits, sizeof(consumer_bits));
     consumer_pending = true;
     chSysUnlock();
@@ -308,6 +393,7 @@ void nrf_spi_send_consumer(const uint8_t bits[4]) {
 
 void nrf_spi_send_battery(uint8_t level) {
     chSysLock();
+    battery_since   = timer_read32();
     battery_level   = level > 100 ? 100 : level;
     battery_polled  = false;
     battery_pending = true;

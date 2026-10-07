@@ -7,11 +7,17 @@
 
 /* SPI1 slave link to the nRF52832 Bluetooth module (docs/reverse-engineering/bluetooth-protocol.md). */
 void nrf_spi_init(void);
-/* Call from the main loop: re-sends the request pulse when the nRF missed it. */
+/* Call from the main loop: re-sends the request pulse when the nRF missed it,
+   and checks that the nRF reads every queued item in time. */
 void nrf_spi_task(void);
+/* True once the nRF (after its hello) left a queued report or host slot request
+   unread for NRF_RESPONSE_TIMEOUT_MS. The stock firmware resets the board then. */
+bool nrf_spi_unresponsive(void);
+/* True once after the nRF sent a second hello (it rebooted: no link). */
+bool nrf_spi_take_restart(void);
 /* Pulse the request line (PB6) low: the nRF answers by polling with command 0x02. */
 void nrf_spi_request(void);
-/* PD2 enables the nRF (low = running). Driven low at init; kept for diagnostics. */
+/* PD2 enables the nRF (low = running). Driven low at init; driven high while off (power.c). */
 void nrf_spi_set_pd2(bool high);
 
 /* True once the nRF sent its hello (0x01). */
@@ -36,6 +42,9 @@ void nrf_spi_pair_slot(uint8_t slot);
 void nrf_spi_delete_slot(uint8_t slot);
 /* True while a host slot request is waiting for the nRF. */
 bool nrf_spi_control_busy(void);
+/* True while the pending request is an idle the nRF has not polled yet, so a
+   select can replace it safely (no 03 transaction in flight). */
+bool nrf_spi_idle_unread(void);
 /* Queue consumer key state: 4 bitmask bytes = BLE consumer reports 2..5 of the stock
    nRF report map (0x02 -> 02 R2 R3 R4 R5). All zero releases. */
 void nrf_spi_send_consumer(const uint8_t bits[4]);
