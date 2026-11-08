@@ -46,7 +46,8 @@ HHKB Professional HYBRID（英語配列, `PD-KB800` 系, USB `04fe:0021`）の�
 - ⚠️ 電池駆動時の省電力動作（4 MHz 動作、走査の間引きと Sleep、USB・読み取り回路の停止。既定で有効、`-e HHKB_LOW_POWER=no` で従来の動作に戻せる）。電池駆動でのキー入力・Bluetooth の接続と切替・電源ボタン長押しの OFF と起動・USB の抜き差しは実機で確認済み。自動スリープ・電源ボタン短押し・電池残量の表示・VIA は未確認。電池持ちの改善幅は未測定 — [docs/usage.md](docs/usage.md#電池駆動時の省電力動作)
 - ✅ インジケータ LED（接続状態・電源）。電池残量の低下は LED では表示せず、Bluetooth のホストに通知します（下の「電池残量」）
 - ✅ 最後に使った BT スロットへ電源 ON 時に再接続（見つからないときは約 60 秒で打ち切り。詳細は [docs/usage.md](docs/usage.md)）
-- ✅ bootmagic（Esc を押しながら接続 → 純正の更新モードに入り、純正 FW へ復帰可能）
+- ✅ bootmagic（Esc を押しながら接続 → 純正の更新モードに入り、純正 FW へ復帰可能）。⚠️ USB 給電中だけ有効にする制限は実機未確認
+- ⚠️ ハング・例外からの自動復帰と診断記録：ウォッチドッグのリセットや CPU の例外では QMK が起動し直し、続けて 3 回起きたときだけ更新モードに入る。状況は `tools/read_diag.py` で読み出せる。実機未確認 — [docs/troubleshooting.md](docs/troubleshooting.md#反応しなくなった原因を調べる診断記録)
 - ⚠️ 電池残量：純正同様の 4 段階（100/15/5/0 %）。詳細と検証状況は [docs/reverse-engineering/power-management.md](docs/reverse-engineering/power-management.md) を参照
 - ✅ JIS 環境で US 刻印どおりに入力する切替機能（`Ctrl+Alt+Shift+J`、VIA 版は任意のキーにも割り当て可）。ビルドオプションで有効/無効を選択可（既定は有効）— [docs/jis-us-toggle.md](docs/jis-us-toggle.md)
 - ✅ VIA 対応（`via` keymap）：キーマップ・マクロ・自動スリープ時間などを VIA で変更、EEPROM に保存 — [docs/via.md](docs/via.md)

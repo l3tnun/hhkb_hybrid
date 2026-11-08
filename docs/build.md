@@ -29,7 +29,8 @@ Next: convert to an HFB and flash (see docs/quickstart.md):
 | オプション | 内容 |
 |---|---|
 | `-e HHKB_JIS_US_TOGGLE=no` | JIS/US 補正の機能をビルドから外す（[jis-us-toggle.md](jis-us-toggle.md)） |
-| `-e HHKB_LOW_POWER=no` | 電池駆動時の省電力動作（4 MHz 動作、走査の間引き、USB と ADC の停止。[usage.md](usage.md#電池駆動時の省電力動作)）をビルドから外す。省電力動作で問題が出たときに従来の動作へ戻すためのもので、このオプションを付けたビルドは省電力動作を入れる前のファームと同じバイナリになる |
+| `-e HHKB_LOW_POWER=no` | 電池駆動時の省電力動作（4 MHz 動作、走査の間引き、USB と ADC の停止。[usage.md](usage.md#電池駆動時の省電力動作)）をビルドから外す。省電力動作で問題が出たときに、省電力動作の無い動作と比べるためのもの |
+| `-e HHKB_DIAG_TEST=yes` | フェイルセーフの試験用。Ctrl+Alt+Shift+F11 でメインループを止め（ウォッチドッグのリセット）、Ctrl+Alt+Shift+F12 で HardFault を起こす（[troubleshooting.md](troubleshooting.md#反応しなくなった原因を調べる診断記録)）。普段使いのファームには付けない |
 
 ## 成果物
 
@@ -78,10 +79,10 @@ python3 tools/qmk_to_hfb.py qmk_firmware/.build/hhkb_hybrid_via.bin local/HHKB80
 
   | ビルド | `.bin` の sha256 |
   |---|---|
-  | `./tools/build.sh via` | `b5d82c52c1f8ed37856cc7c623d539d79ae1eba3a5e8c369f8dd301058a98aa5` |
-  | `./tools/build.sh default` | `70a90ee725d76077692a4d1c32cc07839860590dc4c12f1a799b712ead700dc6` |
-  | `./tools/build.sh via -e HHKB_LOW_POWER=no` | `913a43804ba48d9f360828e9dde4fa9689a96be0bdc8c2d7312df0196ec4721d` |
-  | `./tools/build.sh default -e HHKB_LOW_POWER=no` | `7545454fc358e8b160163efc87f3c5c5dd82b92ff96351c5172e35640537b1c6` |
+  | `./tools/build.sh via` | `f015c9e78eda16041052c3ddb8ecaf7de0ae2b692fac7f43287f7aa9c8f2da9a` |
+  | `./tools/build.sh default` | `341910d153ca813a6a14e2d7112be81ca9044afc310422970146e4ddec41cd72` |
+  | `./tools/build.sh via -e HHKB_LOW_POWER=no` | `f7a57da03b193e741c3f1097bc4fb0cf536c04a303d83cb436f3a4357cfd3569` |
+  | `./tools/build.sh default -e HHKB_LOW_POWER=no` | `36604adc34516a942a44e2b17e12e4af6c622da873313d8e3c68fd2b20ba1aac` |
 
 ## EEPROM 参照の検査
 

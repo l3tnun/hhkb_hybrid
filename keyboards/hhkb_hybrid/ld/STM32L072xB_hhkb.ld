@@ -29,7 +29,7 @@ MEMORY
     flash5  : org = 0x00000000, len = 0
     flash6  : org = 0x00000000, len = 0
     flash7  : org = 0x00000000, len = 0
-    ram0    : org = 0x20000000, len = 20k - 16 /* last 16 bytes: STOP trace (power.c) */
+    ram0    : org = 0x20000000, len = 20k - 64 /* last 64 bytes: reset diagnostics (hhkb_diag.h), last BT slot (power.c) */
     ram1    : org = 0x00000000, len = 0
     ram2    : org = 0x00000000, len = 0
     ram3    : org = 0x00000000, len = 0

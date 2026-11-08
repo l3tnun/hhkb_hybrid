@@ -46,7 +46,7 @@
 
 ## 6. QMK での注意点 (推定)
 
-- **IWDG**: QMK は起動直後に IWDG (約 7 秒) を開始しており、STM32L0 の IWDG は STOP 中も止まらない。期限切れのリセットは `__early_init` のフェイルセーフで**更新モード**に入る → STOP 中も LSI 起動の LPTIM1 (EXTI29) で約 2 秒ごとに起きて IWDG を更新する必要がある
+- **IWDG**: QMK は起動直後に IWDG (約 7 秒) を開始しており、STM32L0 の IWDG は STOP 中も止まらない。期限切れのリセットは `__early_init` のフェイルセーフで記録され、続けて 3 回起きると**更新モード**に入る（[../device-state.md](../device-state.md)） → STOP 中も LSI 起動の LPTIM1 (EXTI29) で約 2 秒ごとに起きて IWDG を更新する必要がある
 - `stm32_clock_init()` は RCC APB1ENR / PWR_CR / CCIPR / SYSCFG_CFGR3 を上書きする → STOP から復帰して再開するより、**起床 = ソフトウェアリセット**が単純 (純正のリセット経路と同様)。代償: ブートローダーが PD2 を High にするので nRF がリセットされ、再接続まで約 10 秒
 - STOP 中は TIM21 (ChibiOS の時刻) が止まる。EXTI の保留 (ボタンのバウンス) はクリアしてから入る
 - リーク対策: PC14/PC7/PC8 を Low、PB6 は High、USB の D+ プルアップと HSI48/VREFINT を止める

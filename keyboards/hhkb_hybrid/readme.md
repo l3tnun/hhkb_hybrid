@@ -38,7 +38,9 @@ python3 tools/flash.py --device /dev/hidrawN local/hhkb_hybrid_default.hfb
 
 ## フェイルセーフ / 起動時の注意
 
-- 起動直後に IWDG（約 7 秒）を開始し、メインループで給餌する。ハング / HardFault で IWDG リセットされると、次回起動時に更新モードへ戻る。
+- 起動直後に IWDG（約 7 秒）を開始し、メインループで給餌する。ハングで IWDG リセットされるか、CPU の例外（HardFault、ハンドラの無い割込み）が起きると、`__early_init` が RAM の診断記録（`boards/HHKB_HYBRID/hhkb_diag.h`）に残して QMK を起動し直す。正常に 60 秒動く前のリセットが続けて 3 回起きたときだけ、更新モードに入る（1 回で入ると、電源の入れ直しでブートローダ内蔵のキーボードに落ち、書き込み直すまで QMK が起動しなくなるため。`docs/device-state.md`）。
+- 診断記録は Raw HID の `AA AA C0 <offset> 00` で読める（`tools/read_diag.py`）。
+- bootmagic は USB 給電中だけ有効（電源ボタンでの起動もソフトウェアリセットで bootmagic を通るため、電池駆動で Esc を誤検出して設定の初期化と更新モードに入らないようにする）。
 - PFU ブートローダは SysTick を動かしたまま割込み禁止でジャンプし、クロック・NVIC も自前設定のまま渡す。`boards/HHKB_HYBRID/board.c` の `__early_init` で SysTick/PendSV の pending クリア、NVIC クリア、PLL→MSI 切り戻しを行ってから ChibiOS のクロック初期化に入る。これが無いと `chSysInit` の割込み許可直後に未登録の SysTick 例外で停止する。
 - STOP 中も IWDG は止まらないため、STOP 中は LPTIM1 で定期起床して給餌する（`power.c`）。
 

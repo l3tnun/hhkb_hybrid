@@ -76,10 +76,39 @@ usb 3-1: can't read configurations, error -71
 |---|---|---|
 | `HHKB-Hybrid` と表示され、**青 LED が点灯したまま**キーが効かない（純正 FW に戻した直後など） | 純正 FW が Bluetooth の接続先へ再接続中で、入力が USB に出ていない | **Fn + Ctrl + 0** で USB に切り替える。それでも効かなければ次の行 |
 | `HHKB-Hybrid` と表示され、キーがまったく効かない | 更新モード（bootmagic、書き込みの中断、QMK のフェイルセーフ） | `--resume` で HFB を書き込む（[device-state.md](device-state.md)） |
+| QMK を書き込んであるのに `HHKB-Hybrid` と表示され、キーは効くが US 配列のまま（JIS/US 補正・VIA が使えない）。直前にキーが効かなくなり、電源の入れ直しで戻った | QMK のフェイルセーフで更新モードに入った後に MCU がリセットされ、ブートローダの内蔵キーボードで動いている（[device-state.md](device-state.md#qmk-が起動しなくなる場合ブートローダの内蔵キーボード)） | `--resume` を付けずに QMK の HFB を書き込む。そのあと下の「反応しなくなった原因を調べる」 |
 | 純正に戻したら、入力できないキーや刻印と違う文字が多発する | VIA 対応版の設定が純正のキーマップ領域に残ったまま戻した | [restore-stock.md](restore-stock.md) の「すでにキー入力が崩れてしまった場合」 |
 | 電池駆動のときだけ、キーの取りこぼし・誤入力、Bluetooth の切断、反応しないなどが起きる（USB 接続では起きない） | 電池駆動時の省電力動作（`HHKB_LOW_POWER`、[usage.md](usage.md#電池駆動時の省電力動作)）が関係している可能性がある | USB に接続する。`HHKB Hybrid QMK` なら、`-e HHKB_LOW_POWER=no` でビルドしたファームを書き込んで同じ症状が出るか確かめる。`HHKB-Hybrid` でキーが効かなければ更新モードなので、同じファームを `--resume` で書き込む |
 | JIS 配列の OS で記号がずれる / US 配列の OS で記号がずれる | JIS/US 補正の ON/OFF が合っていない | Ctrl+Alt+Shift+J で切り替える（[jis-us-toggle.md](jis-us-toggle.md)） |
 | VIA で変えたキーが効かない | 別のレイヤーに割り当てた | VIA でレイヤー番号を確認する |
+
+## 反応しなくなった原因を調べる（診断記録）
+
+QMK は、ウォッチドッグのリセットや CPU の例外が起きたときの状況を、RAM の診断記録に残します。この記録は、リセット・更新モード・ブートローダを経由しても残ります。
+
+```sh
+python3 tools/read_diag.py --map local/<書き込んだ HFB と同じビルドの .map>
+```
+
+- QMK の Raw HID（`--list` の `FLASH TARGET`）に読み出しコマンド（`AA AA C0`）を送るだけで、キーボードのフラッシュや EEPROM には書き込みません。VIA のページは閉じてから実行します。
+- `--map` は省略できます。指定すると、例外が起きた場所を関数名で表示します。`build.sh` は `.build` を毎回消すので、書き込む HFB を作ったときの `.map`（`qmk_firmware/.build/hhkb_hybrid_<keymap>.map`）を `local/` に控えておきます。
+- **電池と USB の両方を外すと、通常は記録が消えます**（RAM の中身が失われるため）。調べ終わるまで電池を外さないでください。電源が一瞬だけ落ちて RAM の中身が残った場合は、記録は消えず、`power-on / brown-out resets that kept the record` が 1 増えます。
+- 診断記録に対応していない版のファームでは、`the firmware does not support the diagnostics read` と表示されます。
+
+表示の見方：
+
+| 項目 | 意味 |
+|---|---|
+| `boots since the record was created` | 記録を作ってからの起動回数。括弧内は、記録を作ったときの起動理由（`PORRST` なら電源が入ったとき）。後の起動では上書きされないので、身に覚えなく記録が作り直されていたら、ここで理由を確かめる |
+| `power-on / brown-out resets that kept the record` | 電源の投入・電圧低下によるリセットのうち、RAM の中身が残って記録が消えなかった回数。電池駆動中に増えていれば、電池の電圧が一瞬下がった可能性がある |
+| `watchdog resets` / `faults` | 記録を作ってからのウォッチドッグのリセット回数 / 例外の回数 |
+| `current streak` | 正常に 60 秒動く前のリセットが続いた回数。3 になると更新モードに入る |
+| `last update-mode request` | 最後に更新モードに入った理由（`flash.py` の E0/F0、`QK_BOOT`・bootmagic、リセットの連続） |
+| `last incident` | 最後のウォッチドッグのリセットまたは例外の状況。起動からの時間、そのとき処理していた場所、USB・電池・Bluetooth の状態、nRF の SPI 割込みの回数、電池残量の端子（PB7/PB8/PB9）の状態 |
+| `exception` / `PC` | 例外の種類と発生場所。割込み中の例外なら `PC (interrupt stack)`、それ以外なら `PC (thread stack)` が正しい値（もう一方は無関係な値のことがある） |
+
+- SPI 割込みの回数が、起動からの時間に対して極端に多い場合（目安として 1 秒あたり数千回を超える場合）は、nRF との通信で割込みが止まらなくなった可能性があります。
+- 報告するときは、`raw=` の行を含めた出力全体と、どのビルド（keymap、オプション、HFB の sha256）を使ったかを添えてください。
 
 ## VIA に接続できない
 

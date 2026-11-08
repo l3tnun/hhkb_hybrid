@@ -9,6 +9,7 @@
 #include "nrf_spi.h"
 #include "led_indicator.h"
 #include "power.h"
+#include "hhkb_diag.h"
 
 extern uint16_t actuation_point[MATRIX_COLS][MATRIX_ROWS];
 
@@ -151,6 +152,7 @@ static bool bt_idle_requested = false; /* BT told to disconnect while on USB */
 /* Wait until the nRF has read the queued report and put it on the air. Only the
    latest report is kept, so a report queued after this overwrites it. */
 static void bt_flush_report(void) {
+    hhkb_diag_stage(HHKB_STAGE_BT_FLUSH);
     for (uint16_t i = 0; i < 40 && !nrf_spi_report_idle(); i++) {
         wait_ms(1); /* nRF poll clears the pending report from its SPI IRQ */
     }
@@ -403,6 +405,7 @@ static void jis_settle(void) {
     if (!output_bt) {
         return;
     }
+    hhkb_diag_stage(HHKB_STAGE_BT_FLUSH);
     for (uint16_t i = 0; i < 40 && !nrf_spi_report_idle(); i++) {
         wait_ms(1); /* nRF poll clears the pending report from its SPI IRQ */
     }
@@ -617,6 +620,22 @@ static bool stock_keys_enabled(void) {
 }
 
 bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
+#ifdef HHKB_DIAG_TEST
+    /* Test build only (HHKB_DIAG_TEST=yes): exercise the watchdog / fault
+       fail-safe and the diagnostics. Ctrl+Alt+Shift+F11 stops the main loop
+       (watchdog reset in ~5..11 s), Ctrl+Alt+Shift+F12 raises a HardFault. */
+    if (record->event.pressed && (keycode == KC_F11 || keycode == KC_F12)) {
+        uint8_t m = get_mods();
+        if ((m & MOD_MASK_CTRL) && (m & MOD_MASK_ALT) && (m & MOD_MASK_SHIFT)) {
+            if (keycode == KC_F11) {
+                for (;;) {
+                    __asm__ volatile("");
+                }
+            }
+            __asm__ volatile("udf #0");
+        }
+    }
+#endif
     if (record->event.pressed) {
         power_note_activity();
         bt_on_user_wake();
@@ -813,6 +832,51 @@ static void led_indicator_update(void) {
     }
 }
 
+/* A run this long ends a streak of watchdog resets / faults
+   (boards/HHKB_HYBRID/board.c), unless the USB fail-safe is about to stop the
+   watchdog feed (a host started enumeration and has not configured us yet). */
+#define HHKB_HEALTHY_RUN_MS 60000
+
+static void diag_update(bool vbus, bool usb_configured, bool usb_pending) {
+    volatile hhkb_diag_t *d = HHKB_DIAG;
+    uint32_t now = timer_read32();
+    uint8_t  f   = 0;
+    if (vbus) {
+        f |= HHKB_DIAG_F_VBUS;
+    }
+    if (power_low_clock()) {
+        f |= HHKB_DIAG_F_LP_CLOCK;
+    }
+    if (output_bt) {
+        f |= HHKB_DIAG_F_BT_OUT;
+    }
+    if (usb_configured) {
+        f |= HHKB_DIAG_F_USB_CFG;
+    }
+    if (nrf_spi_ready()) {
+        f |= HHKB_DIAG_F_NRF_UP;
+    }
+    if (nrf_spi_connected_slot() >= 0) {
+        f |= HHKB_DIAG_F_BT_LINK;
+    }
+    uint8_t b = 0;
+    if (!gpio_read_pin(B7)) {
+        b |= HHKB_DIAG_BATT_15;
+    }
+    if (!gpio_read_pin(B8)) {
+        b |= HHKB_DIAG_BATT_5;
+    }
+    if (!gpio_read_pin(B9)) {
+        b |= HHKB_DIAG_BATT_0;
+    }
+    d->uptime_ms = now;
+    d->flags     = f;
+    d->batt      = b;
+    if (d->streak && now >= HHKB_HEALTHY_RUN_MS && !usb_pending) {
+        d->streak = 0;
+    }
+}
+
 void housekeeping_task_kb(void) {
 #ifdef VIA_ENABLE
     if (via_reset_pending && timer_elapsed32(via_reset_since) >= VIA_RESET_DELAY_MS) {
@@ -845,6 +909,8 @@ void housekeeping_task_kb(void) {
     /* A host is present when USB is powered and configured (a suspended host counts). */
     bool host_present = vbus && usb_configured && (usb_state == USB_ACTIVE || usb_state == USB_SUSPENDED);
 
+    diag_update(vbus, usb_configured, vbus && host_seen && !usb_configured);
+    hhkb_diag_stage(HHKB_STAGE_HK_NRF);
     nrf_spi_task();
     /* The nRF left a request unread: reset like the stock firmware. Only while
        BT is the output, so a dead nRF never interrupts typing over USB. */
@@ -858,6 +924,7 @@ void housekeeping_task_kb(void) {
         bt_begin_try();
     }
     battery_task(vbus);
+    hhkb_diag_stage(HHKB_STAGE_HK_BT);
     if (pairing_mode && timer_elapsed32(pairing_since) > PAIRING_TIMEOUT_MS) {
         pairing_cancel();
     }
@@ -938,15 +1005,19 @@ void housekeeping_task_kb(void) {
 
     led_indicator_update();
     led_indicator_task();
+    hhkb_diag_stage(HHKB_STAGE_HK_POWER);
     power_task(vbus);
 
     /* Fail-safe: on USB power, stop feeding the watchdog only if a host started
        enumeration but did not configure us in time (a charger never enumerates). */
-    if (!vbus || usb_configured || !host_seen || timer_elapsed32(host_seen_since) < HHKB_USB_FAILSAFE_TIMEOUT_MS) {
+    bool usb_failsafe = vbus && !usb_configured && host_seen && timer_elapsed32(host_seen_since) >= HHKB_USB_FAILSAFE_TIMEOUT_MS;
+    if (!usb_failsafe) {
         watchdog_feed();
     }
     housekeeping_task_user();
+    hhkb_diag_stage(HHKB_STAGE_IDLE);
     power_idle(); /* battery: sleep until the next scan */
+    hhkb_diag_stage(usb_failsafe ? HHKB_STAGE_USB_FAILSAFE : HHKB_STAGE_LOOP);
 }
 
 void suspend_power_down_kb(void) {
@@ -969,7 +1040,8 @@ void suspend_power_down_kb(void) {
    stuck, whereas a physical replug recovers by itself (docs/flashing.md). */
 #define UPDATE_MODE_DETACH_MS 500
 
-static void enter_update_mode_detached(void) {
+static void enter_update_mode_detached(uint8_t reason) {
+    HHKB_DIAG->update_reason = reason;
     if (USB_DRIVER.state != USB_STOP) {
         usbDisconnectBus(&USB_DRIVER);
         usbStop(&USB_DRIVER);
@@ -1003,11 +1075,32 @@ void bootmagic_reset_eeprom(void) {
                    stock keymap window first), then enter the update mode. */
 #define FWUP_STOCK_REVERT 0xF0
 
+/* AA AA C0 <offset> 00: read the reset diagnostics (boards/HHKB_HYBRID/hhkb_diag.h).
+   Answer: 55 55 C0 00 <offset> <size> then up to 24 bytes of the record from
+   <offset>. Read only (tools/read_diag.py). */
+#define FWUP_DIAG_READ  0xC0 /* unused by the stock firmware and the bootloader (they use 0xD0) */
+#define DIAG_CHUNK      24
+
+static void diag_read(uint8_t offset, uint8_t *response) {
+    uint8_t size = sizeof(hhkb_diag_t);
+    response[3]  = 0x00;
+    response[4]  = offset;
+    response[5]  = size;
+    for (uint8_t i = 0; i < DIAG_CHUNK && offset + i < size; i++) {
+        response[6 + i] = ((const volatile uint8_t *)HHKB_DIAG)[offset + i];
+    }
+}
+
 static bool fwup_command(uint8_t *data, uint8_t length) {
     if (length < 5 || data[0] != FWUP_REQ_MAGIC || data[1] != FWUP_REQ_MAGIC) {
         return false;
     }
     uint8_t response[RAW_EPSIZE] = {FWUP_RESP_MAGIC, FWUP_RESP_MAGIC, data[2], 0x01, 0x00};
+    if (data[2] == FWUP_DIAG_READ && data[4] == 0) {
+        diag_read(data[3], response);
+        raw_hid_send(response, sizeof(response));
+        return true;
+    }
     bool    enter      = data[2] == FWUP_MODE_CHANGE && data[3] == 0 && data[4] == 0;
     bool    revert     = false;
 #ifdef VIA_ENABLE
@@ -1022,7 +1115,7 @@ static bool fwup_command(uint8_t *data, uint8_t length) {
             clear_stock_keymap_window();
         }
 #endif
-        enter_update_mode_detached();
+        enter_update_mode_detached(enter ? HHKB_UPDATE_E0 : HHKB_UPDATE_F0);
     }
     raw_hid_send(response, sizeof(response));
     return true;
@@ -1040,12 +1133,23 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
 }
 #endif
 
+/* Bootmagic (Esc held at start-up) only on USB power, i.e. when connecting the
+   cable as documented. Every power-on from the button is a software reset that
+   runs bootmagic too; a misread Esc there would leave QMK on battery
+   (settings reset, update mode) with nothing to write the firmware. */
+bool bootmagic_should_reset(void) {
+    if (gpio_read_pin(USB_VBUS_PIN)) {
+        return false; /* PC13 high: no USB power */
+    }
+    return matrix_get_row(BOOTMAGIC_ROW) & (1 << BOOTMAGIC_COLUMN);
+}
+
 /* QK_BOOT / bootmagic: enter the PFU bootloader HID update mode, like the stock
    E0 command; then write an HFB with tools/flash.py --resume. QK_BOOT keeps the
    stock keymap window (VIA settings), so do not use it to go back to the stock
    firmware: use tools/flash.py or bootmagic instead (docs/restore-stock.md). */
 void bootloader_jump(void) {
-    enter_update_mode_detached(); /* QK_BOOT and bootmagic (USB is already started by then) */
+    enter_update_mode_detached(HHKB_UPDATE_BOOT_KEY); /* QK_BOOT and bootmagic (USB is already started by then) */
 }
 
 void mcu_reset(void) {

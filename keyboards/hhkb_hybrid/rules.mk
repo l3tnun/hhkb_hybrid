@@ -24,11 +24,19 @@ SRC += power.c
 
 # Battery low-power run (4 MHz clock, scan every HHKB_LP_SCAN_INTERVAL_MS with
 # WFI sleep in between, USB stopped, OpAmp and ADC off between scans). Enabled
-# by default. Built with =no the firmware is the same as before this option.
+# by default. Built with =no the low-power code is left out.
 # Disable with: ./tools/build.sh <keymap> -e HHKB_LOW_POWER=no
 HHKB_LOW_POWER ?= yes
 ifeq ($(strip $(HHKB_LOW_POWER)), yes)
     OPT_DEFS += -DHHKB_LOW_POWER
+endif
+
+# Test build for the watchdog / fault fail-safe (docs/troubleshooting.md):
+# Ctrl+Alt+Shift+F11 hangs the main loop, Ctrl+Alt+Shift+F12 raises a HardFault.
+# Off by default; never for daily use. Enable with: -e HHKB_DIAG_TEST=yes
+HHKB_DIAG_TEST ?= no
+ifeq ($(strip $(HHKB_DIAG_TEST)), yes)
+    OPT_DEFS += -DHHKB_DIAG_TEST
 endif
 
 # JIS-on-US correction (Ctrl+Alt+Shift+J). Enabled by default.

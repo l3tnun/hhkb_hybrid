@@ -9,6 +9,7 @@
 #include "quantum.h"
 #include <hal.h>
 #include "nrf_spi.h"
+#include "hhkb_diag.h"
 
 #define NRF_REQUEST_PIN B6
 #define NRF_ENABLE_PIN  D2 /* low = nRF running */
@@ -195,6 +196,7 @@ static void handle_rx(uint8_t b) {
 
 OSAL_IRQ_HANDLER(SPI1_IRQ_HANDLER) {
     OSAL_IRQ_PROLOGUE();
+    HHKB_DIAG->spi_irqs++; /* an interrupt storm shows up as a huge count */
 
     uint32_t sr = SPI1->SR;
     if (sr & SPI_SR_OVR) {

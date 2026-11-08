@@ -18,6 +18,7 @@
 #include "power.h"
 #include "nrf_spi.h"
 #include "led_indicator.h"
+#include "hhkb_diag.h"
 #ifdef HHKB_LOW_POWER
 #    include "usb_main.h"
 #endif
@@ -90,6 +91,7 @@ static void retime_timers(uint32_t hclk) {
 }
 
 static void clock_down(void) {
+    hhkb_diag_stage(HHKB_STAGE_CLOCK_DOWN);
     /* USB cannot run without the PLL: detach and power the transceiver down
        (the stock firmware does not start USB on battery). */
     if (USB_DRIVER.state != USB_STOP) {
@@ -126,6 +128,7 @@ static void clock_down(void) {
 }
 
 static void clock_up(void) {
+    hhkb_diag_stage(HHKB_STAGE_CLOCK_UP);
     /* 32 MHz needs one wait state: set it before raising the clock. */
     FLASH->ACR |= FLASH_ACR_LATENCY | FLASH_ACR_PRFTEN | FLASH_ACR_PRE_READ;
     while (!(FLASH->ACR & FLASH_ACR_LATENCY)) {
@@ -288,6 +291,7 @@ static void enter_stop_once(void) {
 
 /* Never returns: STOP until the board should power on, then software-reset. */
 static void enter_off(void) {
+    hhkb_diag_stage(HHKB_STAGE_OFF);
     led_set_mode(LED_MODE_OFF);
     gpio_write_pin_high(A9); /* orange while shutting down (auto-sleep too) */
 
@@ -322,6 +326,7 @@ static void enter_off(void) {
     outputs_off();
     gpio_write_pin_low(A8);
     gpio_write_pin_low(A9);
+    hhkb_diag_stage(HHKB_STAGE_STOP);
 
     for (;;) {
         iwdg_refresh();

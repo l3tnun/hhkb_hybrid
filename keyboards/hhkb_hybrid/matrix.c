@@ -2,6 +2,7 @@
 // Topre capacitive matrix scan for the HHKB Hybrid (STM32L072, ADC1 channel 1).
 // Based on Duncaen's HHKB Classic port (same main board); waits are bounded.
 #include "quantum.h"
+#include "hhkb_diag.h"
 
 #define ADC_WAIT_LIMIT 10000U
 /* Stock firmware releases a pressed key 50 counts below the actuation point */
@@ -66,6 +67,7 @@ static uint16_t adc_read_ch1(void) {
 
 bool matrix_scan_custom(matrix_row_t current_matrix[]) {
     bool matrix_has_changed = false;
+    hhkb_diag_stage(HHKB_STAGE_SCAN);
     // Row drive: B0, B1, B2, B10
     static const uint16_t row_select[MATRIX_ROWS] = {0x1, 0x2, 0x4, 0x400};
     // Col select: B12, B13, B14 (BSRR: set bits low word, reset bits high word)
@@ -132,6 +134,7 @@ bool matrix_scan_custom(matrix_row_t current_matrix[]) {
 #ifdef HHKB_LOW_POWER
     adc_off_if_low_clock();
 #endif
+    hhkb_diag_stage(HHKB_STAGE_LOOP);
 
     return matrix_has_changed;
 }
