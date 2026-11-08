@@ -76,7 +76,7 @@ usb 3-1: can't read configurations, error -71
 |---|---|---|
 | `HHKB-Hybrid` と表示され、**青 LED が点灯したまま**キーが効かない（純正 FW に戻した直後など） | 純正 FW が Bluetooth の接続先へ再接続中で、入力が USB に出ていない | **Fn + Ctrl + 0** で USB に切り替える。それでも効かなければ次の行 |
 | `HHKB-Hybrid` と表示され、キーがまったく効かない | 更新モード（bootmagic、書き込みの中断、QMK のフェイルセーフ） | `--resume` で HFB を書き込む（[device-state.md](device-state.md)） |
-| QMK を書き込んであるのに `HHKB-Hybrid` と表示され、キーは効くが US 配列のまま（JIS/US 補正・VIA が使えない）。直前にキーが効かなくなり、電源の入れ直しで戻った | QMK のフェイルセーフで更新モードに入った後に MCU がリセットされ、ブートローダの内蔵キーボードで動いている（[device-state.md](device-state.md#qmk-が起動しなくなる場合ブートローダの内蔵キーボード)） | `--resume` を付けずに QMK の HFB を書き込む。そのあと下の「反応しなくなった原因を調べる」 |
+| QMK を書き込んであるのに `HHKB-Hybrid` と表示され、キーは効くが US 配列のまま（JIS/US 補正・VIA が使えない）。直前にキーが効かなくなり、電源の入れ直しで戻った | bootmagic（この対策より前の版では、電池駆動での再起動時にも働いた）や QMK のフェイルセーフで更新モードに入った後に MCU がリセットされ、ブートローダの内蔵キーボードで動いている（[device-state.md](device-state.md#qmk-が起動しなくなる場合ブートローダの内蔵キーボード)） | `--resume` を付けずに QMK の HFB を書き込む。そのあと下の「反応しなくなった原因を調べる」 |
 | 純正に戻したら、入力できないキーや刻印と違う文字が多発する | VIA 対応版の設定が純正のキーマップ領域に残ったまま戻した | [restore-stock.md](restore-stock.md) の「すでにキー入力が崩れてしまった場合」 |
 | 電池駆動のときだけ、キーの取りこぼし・誤入力、Bluetooth の切断、反応しないなどが起きる（USB 接続では起きない） | 電池駆動時の省電力動作（`HHKB_LOW_POWER`、[usage.md](usage.md#電池駆動時の省電力動作)）が関係している可能性がある | USB に接続する。`HHKB Hybrid QMK` なら、`-e HHKB_LOW_POWER=no` でビルドしたファームを書き込んで同じ症状が出るか確かめる。`HHKB-Hybrid` でキーが効かなければ更新モードなので、同じファームを `--resume` で書き込む |
 | JIS 配列の OS で記号がずれる / US 配列の OS で記号がずれる | JIS/US 補正の ON/OFF が合っていない | Ctrl+Alt+Shift+J で切り替える（[jis-us-toggle.md](jis-us-toggle.md)） |
