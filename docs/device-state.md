@@ -86,6 +86,9 @@ USB 3-1: product='HHKB-Hybrid' bcdDevice=0001 serial=-
 1. Bluetooth で使用中にキーが効かなくなった
 2. 電源ボタンで OFF/ON すると、Bluetooth・USB ともに入力できるようになった
 3. ただし US 配列のままで、`--list` には `HHKB-Hybrid` と表示された
+4. `--resume` を付けずに QMK を書き込み直すと復旧したが、VIA で変えていたキーマップは初期状態に戻っていた
+
+VIA の設定は、同じ EEPROM 配置の版を書き込み直しても残り、ハングや例外からの更新モード（フェイルセーフ）でも消えません。消えるのは bootmagic（と HHKB メニューの「設定の初期化」）だけです。そのため、この事例は、Bluetooth で使用中（電池駆動）に何らかの理由で再起動し、その起動時の bootmagic が Esc を押下と判定して更新モードに入ったものと考えられます。再起動の理由と、Esc が実際に押されていたのか誤検出なのかは分かっていません。現在の版は、電池駆動では bootmagic を無効にしています。
 
 原因を調べるには、QMK を書き込み直してから [troubleshooting.md](troubleshooting.md) の「反応しなくなった原因を調べる」で診断記録を読み出します。
 
