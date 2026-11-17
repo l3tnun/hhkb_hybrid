@@ -1,5 +1,7 @@
 # HHKB Professional HYBRID — QMK Firmware
 
+[English](README.en.md)
+
 HHKB Professional HYBRID（英語配列, `PD-KB800` 系, USB `04fe:0021`）の純正ファームウェアを **QMK に置き換える**プロジェクトです。純正の更新と同じ範囲（STM32 アプリ領域 64 KiB）だけを HID 経由で書き換えて QMK を動かし、**分解せず**に純正へ戻せることを前提にしています。  
 このリポジトリ 1 つで、誰でも同一のファームウェアを再現できることを目標にしています（QMK 本体をコミット単位で固定）。  
 
